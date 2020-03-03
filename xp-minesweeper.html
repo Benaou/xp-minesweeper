@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Minesweeper</title>
+</head>
+<script>
+//initialize global variables
+var cheats = true;
+var difficulty = 0;
+var difficultyProperties = [[9,9,10], [16,16,40], [31,16,99]]; //format is [width,height,numMines]
+var buttonSize = {'w':25, 'h':25}; //original size is 160x160 in the .jpg
+var numberSize = {'w':26, 'h':46}; //original size is 143x253 in the .jpg
+var board = {'w':0, 'h':0, 'numMines':0, mines:[], checked:[]};
+var gameBoard,gameCtx,gameStatus,statusCtx,sprites,startTime,clockTimer;
+var gameImageCoords = {"unchecked":[0,0], "flag":[160,0], "mine":[320,0], "clickedMine":[480,0], "incorrectFlag":[640,0],
+					"1":[0,160], "2":[160,160], "3":[320,160], "4":[480,160], "0":[640,160],
+					"5":[0,320], "6":[160,320], "7":[320,320], "8":[480,320], "hover":[640,320]};
+var statusImageCoords = {"0":[0,480], "1":[143,480], "2":[286,480], "3":[429,480], "4":[572,480],
+						"5":[0,733], "6":[143,733], "7":[286,733], "8":[429,733], "9":[572,733]}
+
+//helper functions
+function gameDraw(imageId, buttonId) {
+	let imageX,imageY;
+	let buttonX,buttonY;
+	[imageX, imageY] = gameImageCoords[imageId];
+	if(Array.isArray(buttonId)) {
+		[buttonX, buttonY] = buttonId;
+	} else {
+		[buttonX, buttonY] = [buttonId%board.w, Math.floor(buttonId/board.w)];
+	}
+	gameCtx.drawImage(sprites, imageX, imageY, 160, 160, buttonX*buttonSize.w, buttonY*buttonSize.h, buttonSize.w, buttonSize.h);
+}
+
+function statusDraw(nMines, timeElapsed) {
+	let imageX, imageY;
+	nMines = nMines.toString().padStart(3,'0');
+	for(let i=0; i<nMines.length; i++) {
+		[imageX, imageY] = statusImageCoords[nMines[i]];
+		statusCtx.drawImage(sprites, imageX, imageY, 143, 253, i*numberSize.w, 0, numberSize.w, numberSize.h);
+	}
+	timeElapsed = (timeElapsed>999)?'999':timeElapsed.toString().padStart(3,'0');
+	for(let i=0; i<timeElapsed.length; i++) {
+		[imageX, imageY] = statusImageCoords[timeElapsed[i]];
+		statusCtx.drawImage(sprites, imageX, imageY, 143, 253, board.w*buttonSize.w-timeElapsed.length*numberSize.w+i*numberSize.w, 0, numberSize.w, numberSize.h);
+	}
+}
+
+function resetBoardImages() {
+	board.checked.map((value,index) =>
+		{
+			if(value=="unchecked")
+				gameDraw("unchecked", index)
+		}
+	);
+}
+
+function flag(buttonId) {
+	if(board.checked[buttonId]=="unchecked") {
+		gameDraw("flag", buttonId);
+		board.checked[buttonId]="flag";
+		board.numMines--;
+	} else if(board.checked[buttonId]=="flag") {
+		gameDraw("unchecked", buttonId);
+		board.checked[buttonId]="unchecked";
+		board.numMines++;
+	}
+	statusDraw(board.numMines, clockTimer?Math.floor(((new Date()) - startTime)/1000):0);
+}
+
+function neighborsOf(buttonId) {
+	var lrModifiers = [0];
+	var udModifiers = [0];
+	var neighbors = [];
+	if(buttonId%board.w != 0) lrModifiers.push(-1);
+	if((buttonId+1)%board.w != 0) lrModifiers.push(1);
+	if(buttonId-board.w >= 0) udModifiers.push(-board.w);
+	if(buttonId+board.w < board.w*board.h) udModifiers.push(board.w);
+	for(let lrModify of lrModifiers)
+		for(let udModify of udModifiers)
+			if(lrModify || udModify)
+				neighbors.push(buttonId+lrModify+udModify);
+	return neighbors;
+}
+
+function lose(mineId) {
+	for(var buttonId=0; buttonId<board.w*board.h; buttonId++) {
+		if(board.checked[buttonId]!="flag" && board.mines[buttonId]) {
+			board.checked[buttonId] = "mine";
+			gameDraw("mine", buttonId);
+		}
+		if(board.checked[buttonId]=="flag" && !board.mines[buttonId]) {
+			board.checked[buttonId] = "incorrectFlag";
+			gameDraw("incorrectFlag", buttonId);
+		}
+	}
+	gameDraw("clickedMine", mineId);
+	board.checked[mineId] = "clickedMine";
+	gameBoard.removeEventListener("mouseup", spotClick);
+	clearInterval(clockTimer);
+}
+
+function checkForWin() {
+	if(board.checked.filter((state) => state=="unchecked"||state=="flag").length == board.mines.reduce((x,y)=>x+y)) {
+		gameBoard.removeEventListener("mouseup", spotClick);
+		clearInterval(clockTimer);
+		for(var buttonId=0; buttonId<board.w*board.h; buttonId++)
+			if(board.mines[buttonId])
+				if(board.checked[buttonId]!="flag")
+					flag(buttonId);
+	}
+}
+
+function minesAround(buttonId) {
+	var totalMines = 0;
+	for(let neighbor of neighborsOf(buttonId))
+		if(board.mines[neighbor])
+			totalMines++;
+	return totalMines;
+}
+
+function randomizeMines(spotId) {
+	mineIdArray = new Array(board.w*board.h);
+	board.mines.fill(0);
+	for(let i=0; i<board.w*board.h; i++)
+		mineIdArray[i] = i;
+	for(let neighbor of neighborsOf(spotId)) { //guarantee that the spot initially clicked on has no mines around it
+		let neighborIndex = mineIdArray.indexOf(neighbor);
+		mineIdArray = [...mineIdArray.slice(0,neighborIndex), ...mineIdArray.slice(neighborIndex+1,mineIdArray.length)];
+	}
+	let spotIndex = mineIdArray.indexOf(spotId);
+	mineIdArray = [...mineIdArray.slice(0,spotIndex), ...mineIdArray.slice(spotIndex+1, mineIdArray.length)];
+	
+	for(let i=0; i<board.numMines; i++) {
+		let randomIndex = Math.floor(Math.random()*mineIdArray.length);
+		board.mines[mineIdArray[randomIndex]] = 1;
+		mineIdArray = [...mineIdArray.slice(0,randomIndex), ...mineIdArray.slice(randomIndex+1,mineIdArray.length)];
+	}
+}
+
+function initialClick(e) {
+	let buttonX = Math.floor(e.offsetX/buttonSize.w);
+	let buttonY = Math.floor(e.offsetY/buttonSize.h);
+	let buttonId = buttonX+buttonY*board.w;
+	resetBoardImages();
+	switch(e.which) {
+		case 1: //left click
+			randomizeMines(buttonId);
+			checkForMine(buttonId, 0);
+			gameBoard.removeEventListener("mouseup", initialClick);
+			gameBoard.addEventListener("mouseup", spotClick);
+			startTime = new Date();
+			clockTimer = setInterval(()=>{
+				statusDraw(board.numMines, Math.floor(((new Date()) - startTime)/1000));
+			}, 1000);
+			break;
+		case 2: //middle click
+			break;
+		case 3: //right click
+			flag(buttonId);
+			break;
+	}
+}
+
+function spotClick(e) {
+	let buttonX = Math.floor(e.offsetX/buttonSize.w);
+	let buttonY = Math.floor(e.offsetY/buttonSize.h);
+	let buttonId = buttonX+buttonY*board.w;
+	resetBoardImages();
+	switch(e.which) {
+	case 1: //left click
+		checkForMine(buttonId, 0);
+		break;
+	case 2: //middle click
+		if(board.checked[buttonId]!="flag" && board.checked[buttonId]!="unchecked") {
+		var numFlags = 0;
+		for(let neighbor of neighborsOf(buttonId))
+			if(board.checked[neighbor]=="flag")
+				numFlags++;
+			if(numFlags == minesAround(buttonId) && (numFlags > 0))
+			for(let neighbor of neighborsOf(buttonId))
+				checkForMine(neighbor, 0);
+		}
+		break;
+	case 3: //right click
+		flag(buttonId);
+		break;
+	}
+}
+
+function checkForMine(buttonId, recursionLevel) {
+	if(board.checked[buttonId]!="unchecked" || board.checked[buttonId]=="flag")
+		return; //don't check if it's already checked or if it's flagged
+	if(board.mines[buttonId] && recursionLevel == 0) { //clicked on a mine
+		lose(buttonId);
+		return;
+	}
+	let numMinesAround = minesAround(buttonId);
+	board.checked[buttonId] = numMinesAround;
+	gameDraw(numMinesAround.toString(), buttonId);
+	if(numMinesAround == 0)
+		for(let neighbor of neighborsOf(buttonId))
+			if(board.checked[neighbor]=="unchecked")
+				checkForMine(neighbor, recursionLevel+1);
+	checkForWin();
+}
+
+function markFlags() {
+	let i;
+	let spot;
+	let unchecked;
+	let numMinesAround;
+	for(i=0; i<board.w*board.h; i++) {
+		//spot = document.getElementById(i);
+		numMinesAround = parseInt(board.checked[i]);
+		if(numMinesAround > 0) {
+			unchecked = 0;
+			for(neighborId of neighborsOf(i)) {
+				//let neighbor = document.getElementById(neighborId);
+				if(board.checked[neighborId] == "unchecked" || board.checked[neighborId]=="flag")
+					unchecked++;
+			}
+			if(unchecked == numMinesAround) {
+				for(neighborId of neighborsOf(i)) {
+					//let neighbor = document.getElementById(neighborId);
+					if(board.checked[neighborId]=="unchecked")
+						flag(neighborId);
+				}
+			}
+		}
+	}
+}
+
+function sweepField() {
+	var i;
+	var spot;
+	var numMinesAround;
+	var flags;
+	for(i=0; i<board.w*board.h; i++) {
+		//spot = document.getElementById(i);
+		numMinesAround = parseInt(board.checked[i]);
+		if(numMinesAround > 0) {
+			flags = 0;
+			for(neighborId of neighborsOf(i))
+				if(board.checked[neighborId]=="flag")
+					flags++;
+			if(numMinesAround == flags)
+				for(neighborId of neighborsOf(i))
+					checkForMine(neighborId, 0);
+		}
+	}
+}
+
+
+/* A pattern can have 8 variations to it, so instead of hardcoding each of the 8 variations
+for every single pattern, I figured it would be smarter to have a function that will
+take a pattern as an input and then do the 8 variations itself. Here's how the function
+will parse the string given to it:
+
+U - Unchecked area
+F - Unchecked area that should be flagged
+C - Area that should be cleared (if possible)
+A - Anything EXCEPT unchecked area
+1 - Only has 1 unmarked mine around area
+2 - etc.
+| - Next column/row
+Blank (space) - Not a pertinent space to look at, simply a filler to align the rows/columns
+
+For example:
+"UUF|12A|AAA"
+
+*/
+
+function testPattern(patternChar, spotCol, spotRow) {
+	if(patternChar==" ")
+		return true; //Simply return true for any blank spaces since they don't affect the logic
+	if( (spotCol==-1 || spotCol==board.w) || (spotRow==-1 || spotRow==board.h) ) //out of bound by 1 check
+		return patternChar == "A"; //if it's ANYTHING, out of bounds by 1 is okay
+	if( (spotCol<0 || spotCol>=board.w) || (spotRow<0 || spotRow>=board.h) ) //WAY out of bounds check
+		return false;
+	let spotId = spotCol+board.w*spotRow;
+	if(parseInt(patternChar) > 0) //determine if the spot reduces to the number specified
+		return neighborsOf(spotId).map(s => board.checked[s]=="flag"?1:0).reduce((a,b) => a+b) + parseInt(patternChar) == board.checked[spotId];
+	switch(patternChar) {
+	case "F": //marked to be flagged, so it also needs to be unchecked
+	case "U": //unchecked case
+		return board.checked[spotId] == "unchecked";
+		break;
+	case "A": //anything except unchecked (a checked spot/flag/out of bounds)
+		return board.checked[spotId] != "unchecked";
+		break;
+	case "C": //a spot marked to be cleared doesn't have any restrictions (besides being within the boundary).
+			//If it's a flag, it just won't be cleared due to how checkForMine works
+		return true;
+		break;
+	default:
+		throw new Error("Unspecified pattern: \"" + patternChar + "\"");
+	}
+}
+
+function reverseString(str) {
+	var output = "";
+	for(let i=0; i<str.length; i++)
+		output=str.charAt(i)+output;
+	return output;
+}
+
+function reverseArray(arr) {
+	var output = new Array(arr.length);
+	for(let i=0; i<arr.length; i++)
+		output[i] = arr[arr.length-1-i];
+	return output;
+}
+
+function transposeArray(arr) {
+	//return arr.map((_,j,a) => a.map((_,i,b)=>b[i][j]).join(''))
+	//lol this works if the matrix is square or has more rows than columns
+	//when the matrix has more columns than rows, the output becomes square (to the size of the number of rows)
+	//since that's all j can iterate up to is arr.length
+	var output = new Array(arr[0].length);
+	output.fill("");
+	for(let i=0; i<arr.length; i++) {
+		for(let j=0; j<arr[0].length; j++) {
+			output[j] += arr[i][j];
+		}
+	}
+	return output;
+}
+
+function markPattern(patternString) { //patternString must have | as delimiter and have equal sized strings between each |
+	for(let transArray=0; transArray<2; transArray++) { //transArray determines whether the array should be transposed
+		for(let rString=0; rString<2; rString++) { //rString determines whether the strings in the array will be reversed
+			for(let rArray=0; rArray<2; rArray++) { //likewise, rArray determines if the array will be in reverse order
+				let pattern = patternString.split("|");
+				if(transArray) pattern = transposeArray(pattern);
+				if(rString) pattern = pattern.map(reverseString);
+				if(rArray) pattern = reverseArray(pattern);
+				for(let spotRow=-1; spotRow<board.h; spotRow++) {
+					for(let spotCol=-1; spotCol<board.w; spotCol++) {
+						let spotId = spotCol+board.w*spotRow;
+						let patternMatched = true;
+						let clearIdArray = [];
+						let flagIdArray = [];
+						for(let i=0; i<pattern.length; i++) { //index adjustment for each row, selects which row of pattern
+							for(let j=0; j<pattern[i].length; j++) { //index adjustment for each column, also selects character in a pattern's row
+								patternMatched = patternMatched && testPattern(pattern[i][j], spotCol+j, spotRow+i);
+								if(patternMatched) {
+									switch(pattern[i][j]) {
+										case "C":
+											clearIdArray.push(spotCol+j+(spotRow+i)*board.w);
+											break;
+										case "F":
+											flagIdArray.push(spotCol+j+(spotRow+i)*board.w);
+											break;
+										default:
+											break;
+									}
+								}
+							}
+						}
+						if(patternMatched) {
+							for(let flagId of flagIdArray)
+								flag(flagId);
+							for(let clearId of clearIdArray)
+								checkForMine(clearId, 0);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+function hover(e) {
+	if(board.checked.some((value) => value=="mine"))
+		return; //don't hover if you lost
+	let buttonX = Math.floor(e.offsetX/buttonSize.w);
+	let buttonY = Math.floor(e.offsetY/buttonSize.h);
+	let buttonId = buttonX+buttonY*board.w;
+	if(e.which==1) { //left click
+		resetBoardImages();
+		if(board.checked[buttonId]=="unchecked")
+			gameDraw("hover", [buttonX, buttonY]);
+	} else if(e.which==2) { //middle click
+		resetBoardImages();
+		if(board.checked[buttonId]=="unchecked")
+			gameDraw("hover", [buttonX, buttonY]);
+		for(let neighborId of neighborsOf(buttonX+buttonY*board.w))
+			if(board.checked[neighborId]=="unchecked")
+				gameDraw("hover", neighborId);
+	}
+}
+
+function initialize(difficultyCode) {
+	[board.w, board.h, board.numMines] = difficultyProperties[difficultyCode];
+	gameStatus.width = gameBoard.width = board.w*buttonSize.w;
+	gameBoard.height = board.h*buttonSize.h;
+	gameStatus.height = numberSize.h;
+	board.checked = new Array(board.w*board.h);
+	board.checked.fill('unchecked');
+}
+
+window.onload = function() {
+	document.oncontextmenu = function(){return false}; //disable right-clicking
+	gameStatus = document.getElementById('gameStatus');
+	gameBoard = document.getElementById('gameBoard');
+	sprites = new Image();
+	gameCtx = gameBoard.getContext('2d');
+	statusCtx = gameStatus.getContext('2d');
+	sprites.src = 'minesweeper_tiles.jpg';
+	initialize(difficulty);
+	sprites.onload = function () {
+		for(let i=0; i<=board.h; i++)
+			for(let j=0; j<=board.w; j++)
+				gameDraw("unchecked", [j, i]);
+		statusDraw(board.numMines,0);
+		timeStart = 0;
+	};
+	gameBoard.addEventListener('mousedown', hover);
+	gameBoard.addEventListener('mousemove', hover);
+	gameBoard.addEventListener('mouseup', initialClick);
+	gameBoard.addEventListener('mouseleave', resetBoardImages);
+
+	document.body.addEventListener("keydown",
+		function(e) {
+			if(e.key == "r") {
+				//document.getElementById("numMines").innerText = numMines;
+				board.mines.fill(0);
+				board.checked.fill("unchecked");
+				board.numMines = difficultyProperties[difficulty][2];
+				resetBoardImages();
+				statusDraw(board.numMines, 0);
+				startTime = 0;
+				clearInterval(clockTimer);
+				clockTimer = 0;
+				gameBoard.removeEventListener("mouseup",spotClick);
+				gameBoard.addEventListener("mouseup",initialClick);
+			}
+			if((e.key == "=" || e.key == "+") && difficulty < difficultyProperties.length-1) {
+				difficulty++;
+				initialize(difficulty);
+				sprites.onload();
+				gameBoard.removeEventListener("mouseup",spotClick);
+				gameBoard.addEventListener("mouseup",initialClick);
+				clearInterval(clockTimer);
+				clockTimer = 0;
+			}
+			if(e.key == "-" && difficulty > 0) {
+				difficulty--;
+				initialize(difficulty);
+				sprites.onload();
+				gameBoard.removeEventListener("mouseup",spotClick);
+				gameBoard.addEventListener("mouseup",initialClick);
+				clearInterval(clockTimer);
+				clockTimer = 0;
+			}
+			if(e.key == "f" && cheats) {
+				markFlags(); //check for obvious flags
+			}
+			if(e.key == "s" && cheats) {
+				sweepField(); //check for obvious clears based off of flags placed
+			}
+			if(e.key == "d" && cheats) {
+				markPattern("AAA|12A|UUF"); //helps find 121 and 1221 pattern, but generalized
+				markPattern("U1A|U31|FUU"); //little corner case with 131 pattern
+				markPattern("111|U4U|FFF"); //logic based off of a 4
+			}
+			if(e.key == "e" && cheats) {
+				markPattern("AAAC|A11C|AUUC"); //helps clear some spots
+				markPattern("AAA|A1A|U1U|CCC"); //takes it a step further if it reveals a 1
+				markPattern("AAA|A1A|U1U|A1A|CCC"); //takes it even FURTHER if it reveals a middle 1
+				markPattern("AAA |U1AA|U21A|CUUA"); //random corner logic i discovered the other day
+				//markPattern(" AAC|AA1C|U1UU|AAA "); //not sure how to describe this pattern lol
+				markPattern("AAAAC|A1U1C|AAUCC"); //another strange one
+			}
+			if(e.key == "z" && cheats) {
+				isMineArray = JSON.parse("[0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,1,1,0,0,1,0,0,0,0,0,0,1,0,0,0,0,1,1,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1,0,0,1,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,1,1,0,0,0,0,1,0,0,0,0,1,0,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,1,0,1,0,0,0,0,0,0,1,1,1,0,1,0,0,0,0,0,0,1,0,0,1,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1,1,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0,1,0,1,1,1,0,0,1,1,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0]");
+				isMineArray.map((_,i) => {
+					document.getElementById(i)["className"]="unchecked";
+					document.getElementById(i).value=" ";
+				});
+				alreadyChecked.fill(0);
+				checkForMine(17,0);
+			}
+		}
+	);
+	
+}
+</script>
+<body style="background-color: #c0c0c0">
+<canvas id="gameStatus"></canvas><br>
+<canvas id="gameBoard"></canvas>
+</body>
+</html>
