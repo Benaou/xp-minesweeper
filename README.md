@@ -17,3 +17,6 @@ Implemented an algorithm to help if you get stuck!
 - Press S to sweep the field based off of the flags placed (essentially middle-clicks every square for you).
 - Press D to use more advanced techniques to find flags (e.g. the 121 pattern)
 - Press E to use more advanced tehniques to clear spaces
+
+
+Hosted via GitHub Pages: https://benaou.github.io/xp-minesweeper/xp-minesweeper.html
