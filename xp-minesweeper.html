@@ -142,20 +142,22 @@ function initialClick(e) {
 	let buttonY = Math.floor(e.offsetY/buttonSize.h);
 	let buttonId = buttonX+buttonY*board.w;
 	resetBoardImages();
-	switch(e.which) {
-		case 1: //left click
+	switch(e.button) {
+		case 0: //left click
 			randomizeMines(buttonId);
 			checkForMine(buttonId, 0);
-			gameBoard.removeEventListener("mouseup", initialClick);
-			gameBoard.addEventListener("mouseup", spotClick);
+			gameBoard.removeEventListener("click", initialClick);
+			gameBoard.removeEventListener("auxclick", initialClick);
+			gameBoard.addEventListener("click", spotClick);
+			gameBoard.addEventListener("auxclick", spotClick);
 			startTime = new Date();
 			clockTimer = setInterval(()=>{
 				statusDraw(board.numMines, Math.floor(((new Date()) - startTime)/1000));
 			}, 1000);
 			break;
-		case 2: //middle click
+		case 1: //middle click
 			break;
-		case 3: //right click
+		case 2: //right click
 			flag(buttonId);
 			break;
 	}
@@ -166,11 +168,11 @@ function spotClick(e) {
 	let buttonY = Math.floor(e.offsetY/buttonSize.h);
 	let buttonId = buttonX+buttonY*board.w;
 	resetBoardImages();
-	switch(e.which) {
-	case 1: //left click
+	switch(e.button) {
+	case 0: //left click
 		checkForMine(buttonId, 0);
 		break;
-	case 2: //middle click
+	case 1: //middle click
 		if(board.checked[buttonId]!="flag" && board.checked[buttonId]!="unchecked") {
 		var numFlags = 0;
 		for(let neighbor of neighborsOf(buttonId))
@@ -181,7 +183,7 @@ function spotClick(e) {
 				checkForMine(neighbor, 0);
 		}
 		break;
-	case 3: //right click
+	case 2: //right click
 		flag(buttonId);
 		break;
 	}
@@ -376,11 +378,11 @@ function hover(e) {
 	let buttonX = Math.floor(e.offsetX/buttonSize.w);
 	let buttonY = Math.floor(e.offsetY/buttonSize.h);
 	let buttonId = buttonX+buttonY*board.w;
-	if(e.which==1) { //left click
+	if(e.buttons==1) { //left click
 		resetBoardImages();
 		if(board.checked[buttonId]=="unchecked")
 			gameDraw("hover", [buttonX, buttonY]);
-	} else if(e.which==2) { //middle click
+	} else if(e.buttons==4) { //middle click
 		resetBoardImages();
 		if(board.checked[buttonId]=="unchecked")
 			gameDraw("hover", [buttonX, buttonY]);
@@ -400,7 +402,7 @@ function initialize(difficultyCode) {
 }
 
 window.onload = function() {
-	document.oncontextmenu = function(){return false}; //disable right-clicking
+	document.oncontextmenu = function(e){e.preventDefault();}; //disable right-clicking
 	gameStatus = document.getElementById('gameStatus');
 	gameBoard = document.getElementById('gameBoard');
 	sprites = new Image();
@@ -417,7 +419,8 @@ window.onload = function() {
 	};
 	gameBoard.addEventListener('mousedown', hover);
 	gameBoard.addEventListener('mousemove', hover);
-	gameBoard.addEventListener('mouseup', initialClick);
+	gameBoard.addEventListener('click', initialClick);
+	gameBoard.addEventListener('auxclick', initialClick);
 	gameBoard.addEventListener('mouseleave', resetBoardImages);
 
 	document.body.addEventListener("keydown",
@@ -432,15 +435,19 @@ window.onload = function() {
 				startTime = 0;
 				clearInterval(clockTimer);
 				clockTimer = 0;
-				gameBoard.removeEventListener("mouseup",spotClick);
-				gameBoard.addEventListener("mouseup",initialClick);
+				gameBoard.removeEventListener("click",spotClick);
+				gameBoard.removeEventListener("auxclick",spotClick);
+				gameBoard.addEventListener("click",initialClick);
+				gameBoard.addEventListener("auxclick",initialClick);
 			}
 			if((e.key == "=" || e.key == "+") && difficulty < difficultyProperties.length-1) {
 				difficulty++;
 				initialize(difficulty);
 				sprites.onload();
-				gameBoard.removeEventListener("mouseup",spotClick);
-				gameBoard.addEventListener("mouseup",initialClick);
+				gameBoard.removeEventListener("click",spotClick);
+				gameBoard.removeEventListener("auxclick",spotClick);
+				gameBoard.addEventListener("click",initialClick);
+				gameBoard.addEventListener("auxclick",initialClick);
 				clearInterval(clockTimer);
 				clockTimer = 0;
 			}
@@ -448,8 +455,10 @@ window.onload = function() {
 				difficulty--;
 				initialize(difficulty);
 				sprites.onload();
-				gameBoard.removeEventListener("mouseup",spotClick);
-				gameBoard.addEventListener("mouseup",initialClick);
+				gameBoard.removeEventListener("click",spotClick);
+				gameBoard.removeEventListener("auxclick",spotClick);
+				gameBoard.addEventListener("click",initialClick);
+				gameBoard.addEventListener("auxclick",initialClick);
 				clearInterval(clockTimer);
 				clockTimer = 0;
 			}
