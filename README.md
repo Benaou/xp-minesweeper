@@ -13,7 +13,7 @@ Use +/- to increase/decrease difficulty:
 First click generates the board and guarantees the spot you click is an open space to help get started.
 
 Implemented an algorithm to help if you get stuck!
-Press F to flag spaces that must be flags due to the number next to them. (e.g. an 8 means all 8 spaces around it must be flags)
-Press S to sweep the field based off of the flags placed (essentially middle-clicks every square for you).
-Press D to use more advanced techniques to find flags (e.g. the 121 pattern)
-Press E to use more advanced tehniques to clear spaces
+- Press F to flag spaces that must be flags due to the number next to them. (e.g. an 8 means all 8 spaces around it must be flags)
+- Press S to sweep the field based off of the flags placed (essentially middle-clicks every square for you).
+- Press D to use more advanced techniques to find flags (e.g. the 121 pattern)
+- Press E to use more advanced tehniques to clear spaces
