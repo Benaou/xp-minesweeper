@@ -16,7 +16,8 @@ var gameImageCoords = {"unchecked":[0,0], "flag":[160,0], "mine":[320,0], "click
 					"1":[0,160], "2":[160,160], "3":[320,160], "4":[480,160], "0":[640,160],
 					"5":[0,320], "6":[160,320], "7":[320,320], "8":[480,320], "hover":[640,320]};
 var statusImageCoords = {"0":[0,480], "1":[143,480], "2":[286,480], "3":[429,480], "4":[572,480],
-						"5":[0,733], "6":[143,733], "7":[286,733], "8":[429,733], "9":[572,733]}
+						"5":[0,733], "6":[143,733], "7":[286,733], "8":[429,733], "9":[572,733],
+						"smile":[0,1239]}
 
 //helper functions
 function gameDraw(imageId, buttonId) {
@@ -43,6 +44,8 @@ function statusDraw(nMines, timeElapsed) {
 		[imageX, imageY] = statusImageCoords[timeElapsed[i]];
 		statusCtx.drawImage(sprites, imageX, imageY, 143, 253, board.w*buttonSize.w-timeElapsed.length*numberSize.w+i*numberSize.w, 0, numberSize.w, numberSize.h);
 	}
+	[imageX, imageY] = statusImageCoords["smile"];
+	statusCtx.drawImage(sprites, imageX, imageY, 187, 187, board.w*buttonSize.w/2-numberSize.h/2, 0, numberSize.h, numberSize.h);
 }
 
 function resetBoardImages() {
@@ -360,6 +363,7 @@ function markPattern(patternString) { //patternString must have | as delimiter a
 							}
 						}
 						if(patternMatched) {
+							if(patternString == "AA1U|A22U|FUUC") console.log(`Zachs pattern found: \n Flag: ${flagIdArray[0]} \n Clear: ${clearIdArray[0]}`);
 							for(let flagId of flagIdArray)
 								flag(flagId);
 							for(let clearId of clearIdArray)
@@ -480,6 +484,7 @@ window.onload = function() {
 				markPattern("AAA |U1AA|U21A|CUUA"); //random corner logic i discovered the other day
 				//markPattern(" AAC|AA1C|U1UU|AAA "); //not sure how to describe this pattern lol
 				markPattern("AAAAC|A1U1C|AAUCC"); //another strange one
+				markPattern("AA1U|A22U|FUUC"); //kudos to Zach
 			}
 			if(e.key == "z" && cheats) {
 				isMineArray = JSON.parse("[0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,1,1,0,0,1,0,0,0,0,0,0,1,0,0,0,0,1,1,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1,0,0,1,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,1,1,0,0,0,0,1,0,0,0,0,1,0,0,1,0,1,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,1,0,1,0,0,0,0,0,0,1,1,1,0,1,0,0,0,0,0,0,1,0,0,1,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1,1,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0,1,0,1,1,1,0,0,1,1,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1,0,1,0,0,1,1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0]");
