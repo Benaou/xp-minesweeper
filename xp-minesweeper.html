@@ -44,8 +44,10 @@ function statusDraw(nMines, timeElapsed) {
 		[imageX, imageY] = statusImageCoords[timeElapsed[i]];
 		statusCtx.drawImage(sprites, imageX, imageY, 143, 253, board.w*buttonSize.w-timeElapsed.length*numberSize.w+i*numberSize.w, 0, numberSize.w, numberSize.h);
 	}
+	[imageX, imageY] = gameImageCoords["unchecked"];
+	statusCtx.drawImage(sprites, imageX, imageY, 160, 160, board.w*buttonSize.w/2-numberSize.h/2, 0, numberSize.h, numberSize.h);
 	[imageX, imageY] = statusImageCoords["smile"];
-	statusCtx.drawImage(sprites, imageX, imageY, 187, 187, board.w*buttonSize.w/2-numberSize.h/2, 0, numberSize.h, numberSize.h);
+	statusCtx.drawImage(sprites, imageX, imageY, 187, 187, board.w*buttonSize.w/2-numberSize.h/2+3, 3, numberSize.h-6, numberSize.h-6);
 }
 
 function resetBoardImages() {
